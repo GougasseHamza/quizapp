@@ -5,13 +5,25 @@
     <div class="filters">
       <select v-model="selectedQuiz" class="filter-select">
         <option value="">All Quizzes</option>
-        <option v-for="quiz in quizzes" :key="quiz.id" :value="quiz.id">
+        <option v-for="quiz in availableQuizzes" :key="quiz.id" :value="quiz.id">
           {{ quiz.title }}
         </option>
       </select>
     </div>
 
-    <div class="leaderboard-grid">
+    <div v-if="loading" class="loading">
+      Loading scores...
+    </div>
+
+    <div v-else-if="error" class="error">
+      {{ error }}
+    </div>
+
+    <div v-else-if="scores.length === 0" class="no-scores">
+      No scores available yet.
+    </div>
+
+    <div v-else class="leaderboard-grid">
       <div class="leaderboard-header">
         <div>Rank</div>
         <div>User</div>
@@ -20,9 +32,9 @@
         <div>Date</div>
       </div>
       
-      <div v-for="(score, index) in filteredScores" :key="score.id" class="leaderboard-row">
+      <div v-for="(score, index) in scores" :key="score.id" class="leaderboard-row">
         <div class="rank">{{ index + 1 }}</div>
-        <div class="user">{{ score.userName }}</div>
+        <div class="user">{{ score.userName || 'Anonymous' }}</div>
         <div class="quiz">{{ getQuizTitle(score.quizId) }}</div>
         <div class="score">{{ score.score }}/{{ getQuizMaxScore(score.quizId) }}</div>
         <div class="date">{{ formatDate(score.date) }}</div>
@@ -32,24 +44,27 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useQuizStore } from '../stores/quiz'
+import { useScoreStore } from '../stores/score'
 import { storeToRefs } from 'pinia'
 
 const quizStore = useQuizStore()
+const scoreStore = useScoreStore()
 const { availableQuizzes } = storeToRefs(quizStore)
+const { scores, loading, error } = storeToRefs(scoreStore)
+
 const selectedQuiz = ref('')
 
-// Mock data - will be replaced with actual data from backend
-const mockScores = [
-  { id: '1', userName: 'John Doe', quizId: '1', score: 8, date: '2024-04-14' },
-  { id: '2', userName: 'Jane Smith', quizId: '1', score: 7, date: '2024-04-14' },
-  { id: '3', userName: 'Bob Johnson', quizId: '2', score: 9, date: '2024-04-13' },
-]
+// Fetch quizzes when component mounts
+onMounted(async () => {
+  await quizStore.fetchQuizzes()
+  await scoreStore.fetchScores()
+})
 
-const filteredScores = computed(() => {
-  if (!selectedQuiz.value) return mockScores
-  return mockScores.filter(score => score.quizId === selectedQuiz.value)
+// Watch for changes in selected quiz
+watch(selectedQuiz, async (newQuizId) => {
+  await scoreStore.fetchScores(newQuizId)
 })
 
 const getQuizTitle = (quizId) => {
@@ -62,8 +77,10 @@ const getQuizMaxScore = (quizId) => {
   return quiz ? quiz.questions.length : 0
 }
 
-const formatDate = (dateString) => {
-  return new Date(dateString).toLocaleDateString()
+const formatDate = (date) => {
+  if (!date) return 'N/A'
+  const d = date.toDate ? date.toDate() : new Date(date)
+  return d.toLocaleDateString()
 }
 </script>
 
@@ -75,30 +92,29 @@ const formatDate = (dateString) => {
 }
 
 .filters {
-  margin: 2rem 0;
-  display: flex;
-  gap: 1rem;
+  margin-bottom: 2rem;
 }
 
 .filter-select {
-  padding: 0.5rem;
-  border-radius: 4px;
+  padding: 0.5rem 1rem;
   border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
   min-width: 200px;
 }
 
 .leaderboard-grid {
   background: white;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .leaderboard-header {
   display: grid;
   grid-template-columns: 80px 1fr 1fr 100px 120px;
   padding: 1rem;
-  background: var(--background-color);
+  background: #f5f5f5;
   font-weight: bold;
   border-bottom: 1px solid #ddd;
 }
@@ -116,10 +132,29 @@ const formatDate = (dateString) => {
 
 .rank {
   font-weight: bold;
-  color: var(--primary-color);
+  color: #666;
+}
+
+.user {
+  font-weight: 500;
 }
 
 .score {
   font-weight: bold;
+  color: #4caf50;
+}
+
+.loading, .error, .no-scores {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+
+.error {
+  color: #c62828;
+}
+
+.no-scores {
+  font-style: italic;
 }
 </style> 

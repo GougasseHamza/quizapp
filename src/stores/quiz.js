@@ -166,24 +166,37 @@ export const useQuizStore = defineStore('quiz', () => {
 
     quizEndTime.value = new Date()
     const timeTaken = Math.floor((quizEndTime.value - quizStartTime.value) / 1000)
+    const currentDate = new Date()
 
     try {
       // Save quiz attempt to Firestore
       const quizAttempt = {
         userId: authStore.user.uid,
+        userName: authStore.user.displayName || 'Anonymous',
         quizId: currentQuiz.value.id,
         score: score.value,
         totalQuestions: currentQuiz.value.questions.length,
         timeTaken,
-        date: new Date(),
+        date: currentDate,
         answers: userAnswers.value,
         quizTitle: currentQuiz.value.title,
         quizCategory: currentQuiz.value.category,
         quizDifficulty: currentQuiz.value.difficulty
       }
 
-      // Save quiz attempt
+      // Save to quizAttempts collection for user history
       await addDoc(collection(db, 'quizAttempts'), quizAttempt)
+
+      // Save to scores collection for leaderboard
+      const leaderboardScore = {
+        userId: authStore.user.uid,
+        userName: authStore.user.displayName || 'Anonymous',
+        quizId: currentQuiz.value.id,
+        score: score.value,
+        totalQuestions: currentQuiz.value.questions.length,
+        date: currentDate
+      }
+      await addDoc(collection(db, 'scores'), leaderboardScore)
 
       // Update user's quiz statistics
       const userStatsRef = doc(db, 'userStats', authStore.user.uid)
@@ -201,30 +214,24 @@ export const useQuizStore = defineStore('quiz', () => {
           totalQuizzes: newTotalQuizzes,
           totalScore: newTotalScore,
           averageScore: newAverageScore,
-          lastQuizAttempt: new Date()
+          lastQuizAttempt: currentDate
         })
       } else {
         await setDoc(userStatsRef, {
           totalQuizzes: 1,
           totalScore: scorePercentage,
           averageScore: scorePercentage,
-          lastQuizAttempt: new Date()
+          lastQuizAttempt: currentDate
         })
       }
 
       // Reset quiz state
-      currentQuiz.value = null
-      currentQuestionIndex.value = 0
-      userAnswers.value = []
-      quizStartTime.value = null
-      quizEndTime.value = null
-      quizCompleted.value = false
-      score.value = 0
+      resetQuiz()
 
-      return score.value
-    } catch (error) {
-      console.error('Error saving quiz attempt:', error)
-      throw error
+      return true
+    } catch (err) {
+      console.error('Error saving quiz results:', err)
+      throw err
     }
   }
 
