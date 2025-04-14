@@ -38,12 +38,15 @@ const getQuizzes = async () => {
 // Function to get a single quiz by ID
 const getQuizById = async (quizId) => {
   try {
+    console.log('Fetching quiz with ID:', quizId)
     const quizDoc = await getDoc(doc(db, 'quizzes', quizId))
     if (quizDoc.exists()) {
-      return {
+      const quizData = {
         id: quizDoc.id,
         ...quizDoc.data()
       }
+      console.log('Quiz data retrieved:', quizData)
+      return quizData
     } else {
       console.log('No such quiz!')
       return null

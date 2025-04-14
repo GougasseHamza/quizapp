@@ -98,12 +98,21 @@ export const useQuizStore = defineStore('quiz', () => {
     loading.value = true
     error.value = null
     try {
-      const quiz = await fetchQuizById(quizId)
+      // Reset quiz state
+      currentQuiz.value = null
+      currentQuestionIndex.value = 0
+      userAnswers.value = []
+      quizCompleted.value = false
+      
+      // Fetch quiz from Firebase
+      const quiz = await getQuizById(quizId)
+      
       if (quiz) {
+        // Set current quiz
         currentQuiz.value = quiz
-        currentQuestionIndex.value = 0
-        userAnswers.value = []
-        quizCompleted.value = false
+        console.log('Quiz loaded:', quiz)
+      } else {
+        error.value = 'Quiz not found'
       }
     } catch (err) {
       error.value = err.message
@@ -114,8 +123,10 @@ export const useQuizStore = defineStore('quiz', () => {
   }
 
   const submitAnswer = (answer) => {
+    if (!currentQuiz.value || !currentQuestion.value) return
+    
     userAnswers.value.push({
-      questionId: currentQuiz.value.questions[currentQuestionIndex.value].id,
+      questionId: currentQuestion.value.id,
       answer
     })
 
@@ -127,12 +138,12 @@ export const useQuizStore = defineStore('quiz', () => {
   }
 
   const currentQuestion = computed(() => {
-    if (!currentQuiz.value) return null
+    if (!currentQuiz.value || !currentQuiz.value.questions) return null
     return currentQuiz.value.questions[currentQuestionIndex.value]
   })
 
   const score = computed(() => {
-    if (!quizCompleted.value) return 0
+    if (!quizCompleted.value || !currentQuiz.value) return 0
     return userAnswers.value.reduce((total, userAnswer) => {
       const question = currentQuiz.value.questions.find(q => q.id === userAnswer.questionId)
       return total + (question.correctAnswer === userAnswer.answer ? 1 : 0)

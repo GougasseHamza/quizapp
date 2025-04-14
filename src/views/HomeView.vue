@@ -22,7 +22,7 @@
           <span class="difficulty">{{ quiz.difficulty }}</span>
         </div>
         <p>{{ quiz.questions.length }} questions</p>
-        <button @click="startQuiz(quiz.id)" class="start-button">Start Quiz</button>
+        <button @click="handleStartQuiz(quiz.id)" class="start-button">Start Quiz</button>
       </div>
     </div>
   </div>
@@ -37,7 +37,6 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 const quizStore = useQuizStore()
 const { availableQuizzes, loading, error } = storeToRefs(quizStore)
-const { startQuiz } = quizStore
 
 // Fetch quizzes when component mounts
 onMounted(async () => {

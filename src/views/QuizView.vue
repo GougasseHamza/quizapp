@@ -37,7 +37,7 @@
 <script setup>
 import { useQuizStore } from '../stores/quiz'
 import { storeToRefs } from 'pinia'
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
@@ -46,9 +46,25 @@ const quizStore = useQuizStore()
 const { currentQuiz, currentQuestion, currentQuestionIndex, quizCompleted, score, loading, error } = storeToRefs(quizStore)
 const { startQuiz, submitAnswer, resetQuiz } = quizStore
 
+// Watch for route changes to load the correct quiz
+watch(() => route.params.id, async (newId) => {
+  if (newId) {
+    await loadQuiz(newId)
+  }
+}, { immediate: true })
+
+// Load quiz function
+const loadQuiz = async (quizId) => {
+  try {
+    await startQuiz(quizId)
+  } catch (err) {
+    console.error('Error loading quiz:', err)
+  }
+}
+
 onMounted(async () => {
   if (route.params.id) {
-    await startQuiz(route.params.id)
+    await loadQuiz(route.params.id)
   } else {
     router.push('/')
   }
