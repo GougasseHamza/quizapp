@@ -1,8 +1,31 @@
 <template>
   <div class="home">
     <h2>Available Quizzes</h2>
+    
+    <div class="filters">
+      <div class="search-container">
+        <input
+          type="text"
+          v-model="searchQuery"
+          placeholder="Search quizzes..."
+          class="search-input"
+        />
+      </div>
+      
+      <div class="difficulty-filters">
+        <button
+          v-for="level in difficultyLevels"
+          :key="level"
+          :class="['difficulty-filter', { active: selectedDifficulty === level }]"
+          @click="toggleDifficulty(level)"
+        >
+          {{ level }}
+        </button>
+      </div>
+    </div>
+
     <div class="quiz-grid">
-      <div v-for="quiz in availableQuizzes" :key="quiz.id" class="quiz-card">
+      <div v-for="quiz in filteredQuizzes" :key="quiz.id" class="quiz-card">
         <h3>{{ quiz.title }}</h3>
         <div class="quiz-info">
           <span class="category">{{ quiz.category }}</span>
@@ -18,15 +41,90 @@
 <script setup>
 import { useQuizStore } from '../stores/quiz'
 import { storeToRefs } from 'pinia'
+import { ref, computed } from 'vue'
 
 const quizStore = useQuizStore()
 const { availableQuizzes } = storeToRefs(quizStore)
 const { startQuiz } = quizStore
+
+const searchQuery = ref('')
+const selectedDifficulty = ref('')
+
+const difficultyLevels = ['All', 'Easy', 'Medium', 'Hard']
+
+const toggleDifficulty = (level) => {
+  if (level === 'All') {
+    selectedDifficulty.value = ''
+  } else {
+    selectedDifficulty.value = selectedDifficulty.value === level ? '' : level
+  }
+}
+
+const filteredQuizzes = computed(() => {
+  return availableQuizzes.value.filter(quiz => {
+    const matchesSearch = quiz.title.toLowerCase().includes(searchQuery.value.toLowerCase())
+    const matchesDifficulty = !selectedDifficulty.value || 
+                            selectedDifficulty.value === 'All' || 
+                            quiz.difficulty === selectedDifficulty.value
+    return matchesSearch && matchesDifficulty
+  })
+})
 </script>
 
 <style scoped>
 .home {
   padding: 2rem;
+}
+
+.filters {
+  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.search-container {
+  width: 100%;
+  max-width: 500px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #4caf50;
+}
+
+.difficulty-filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.difficulty-filter {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.difficulty-filter:hover {
+  background: #f5f5f5;
+}
+
+.difficulty-filter.active {
+  background: #4caf50;
+  color: white;
+  border-color: #4caf50;
 }
 
 .quiz-grid {
@@ -81,6 +179,7 @@ const { startQuiz } = quizStore
   cursor: pointer;
   width: 100%;
   margin-top: 1rem;
+  text-decoration: none;
 }
 
 .start-button:hover {
