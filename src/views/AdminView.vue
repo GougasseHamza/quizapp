@@ -2,6 +2,10 @@
   <div class="admin">
     <h2>Admin Dashboard</h2>
     
+    <div v-if="error" class="error-message">
+      {{ error }}
+    </div>
+    
     <div class="admin-actions">
       <button @click="showCreateQuiz = true" class="action-button">
         Create New Quiz
@@ -10,7 +14,16 @@
 
     <div class="quizzes-list">
       <h3>Manage Quizzes</h3>
-      <div class="quiz-grid">
+      
+      <div v-if="loading" class="loading">
+        Loading quizzes...
+      </div>
+      
+      <div v-else-if="availableQuizzes.length === 0" class="no-quizzes">
+        No quizzes found. Create your first quiz!
+      </div>
+      
+      <div v-else class="quiz-grid">
         <div v-for="quiz in availableQuizzes" :key="quiz.id" class="quiz-card">
           <div class="quiz-header">
             <h4>{{ quiz.title }}</h4>
@@ -87,8 +100,8 @@
             <button type="button" @click="showCreateQuiz = false" class="cancel-button">
               Cancel
             </button>
-            <button type="submit" class="save-button">
-              {{ editingQuiz ? 'Update Quiz' : 'Create Quiz' }}
+            <button type="submit" class="save-button" :disabled="isSubmitting">
+              {{ isSubmitting ? 'Saving...' : (editingQuiz ? 'Update Quiz' : 'Create Quiz') }}
             </button>
           </div>
         </form>
@@ -98,15 +111,16 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useQuizStore } from '../stores/quiz'
 import { storeToRefs } from 'pinia'
 
 const quizStore = useQuizStore()
-const { availableQuizzes } = storeToRefs(quizStore)
+const { availableQuizzes, loading, error } = storeToRefs(quizStore)
 
 const showCreateQuiz = ref(false)
 const editingQuiz = ref(null)
+const isSubmitting = ref(false)
 
 const quizForm = reactive({
   title: '',
@@ -122,6 +136,11 @@ const quizForm = reactive({
       correctAnswer: '1'
     }
   ]
+})
+
+// Fetch quizzes when component mounts
+onMounted(async () => {
+  await quizStore.fetchQuizzes()
 })
 
 const editQuiz = (quiz) => {
@@ -156,17 +175,46 @@ const addOption = (questionIndex) => {
   })
 }
 
-const saveQuiz = () => {
-  // TODO: Implement save logic with backend
-  showCreateQuiz.value = false
-  editingQuiz.value = null
-  resetForm()
+const saveQuiz = async () => {
+  isSubmitting.value = true
+  
+  try {
+    // Prepare quiz data
+    const quizData = {
+      title: quizForm.title,
+      category: quizForm.category,
+      difficulty: quizForm.difficulty,
+      questions: quizForm.questions.map(q => ({
+        ...q,
+        type: 'multiple-choice' // Ensure type is set
+      }))
+    }
+    
+    if (editingQuiz.value) {
+      // Update existing quiz
+      await quizStore.editQuiz(editingQuiz.value.id, quizData)
+    } else {
+      // Create new quiz
+      await quizStore.createQuiz(quizData)
+    }
+    
+    showCreateQuiz.value = false
+    editingQuiz.value = null
+    resetForm()
+  } catch (err) {
+    console.error('Error saving quiz:', err)
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
-const deleteQuiz = (id) => {
-  // TODO: Implement delete logic with backend
+const deleteQuiz = async (id) => {
   if (confirm('Are you sure you want to delete this quiz?')) {
-    console.log('Delete quiz:', id)
+    try {
+      await quizStore.removeQuiz(id)
+    } catch (err) {
+      console.error('Error deleting quiz:', err)
+    }
   }
 }
 
@@ -196,6 +244,20 @@ const resetForm = () => {
 
 .admin-actions {
   margin-bottom: 2rem;
+}
+
+.error-message {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 1rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.loading, .no-quizzes {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
 }
 
 .action-button {
@@ -340,5 +402,10 @@ const resetForm = () => {
   padding: 0.5rem 1rem;
   border-radius: 4px;
   cursor: pointer;
+}
+
+.save-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 </style> 

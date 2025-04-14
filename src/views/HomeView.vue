@@ -1,7 +1,20 @@
 <template>
   <div class="home">
     <h2>Available Quizzes</h2>
-    <div class="quiz-grid">
+    
+    <div v-if="loading" class="loading">
+      Loading quizzes...
+    </div>
+    
+    <div v-else-if="error" class="error">
+      {{ error }}
+    </div>
+    
+    <div v-else-if="availableQuizzes.length === 0" class="no-quizzes">
+      No quizzes available. Check back later!
+    </div>
+    
+    <div v-else class="quiz-grid">
       <div v-for="quiz in availableQuizzes" :key="quiz.id" class="quiz-card">
         <h3>{{ quiz.title }}</h3>
         <div class="quiz-info">
@@ -18,15 +31,38 @@
 <script setup>
 import { useQuizStore } from '../stores/quiz'
 import { storeToRefs } from 'pinia'
+import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
 const quizStore = useQuizStore()
-const { availableQuizzes } = storeToRefs(quizStore)
+const { availableQuizzes, loading, error } = storeToRefs(quizStore)
 const { startQuiz } = quizStore
+
+// Fetch quizzes when component mounts
+onMounted(async () => {
+  await quizStore.fetchQuizzes()
+})
+
+// Navigate to quiz page
+const handleStartQuiz = (quizId) => {
+  router.push(`/quiz/${quizId}`)
+}
 </script>
 
 <style scoped>
 .home {
   padding: 2rem;
+}
+
+.loading, .error, .no-quizzes {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+
+.error {
+  color: #c62828;
 }
 
 .quiz-grid {
