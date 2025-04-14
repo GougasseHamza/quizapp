@@ -1,12 +1,19 @@
 <template>
   <div class="quiz">
-    <div v-if="!currentQuiz" class="loading">
+    <div v-if="loading" class="loading">
+      <p>Loading quiz...</p>
+    </div>
+    <div v-else-if="error" class="error">
+      <p>{{ error }}</p>
+      <button @click="router.push('/')" class="reset-button">Back to Home</button>
+    </div>
+    <div v-else-if="!currentQuiz" class="loading">
       <p>Loading quiz...</p>
     </div>
     <div v-else-if="quizCompleted" class="results">
       <h2>Quiz Completed!</h2>
       <p>Your score: {{ score }}/{{ currentQuiz.questions.length }}</p>
-      <button @click="resetQuiz" class="reset-button">Back to Quizzes</button>
+      <button @click="handleReset" class="reset-button">Back to Quizzes</button>
     </div>
     <div v-else class="question-container">
       <div class="progress">
@@ -36,12 +43,12 @@ import { useRoute, useRouter } from 'vue-router'
 const route = useRoute()
 const router = useRouter()
 const quizStore = useQuizStore()
-const { currentQuiz, currentQuestion, currentQuestionIndex, quizCompleted, score } = storeToRefs(quizStore)
+const { currentQuiz, currentQuestion, currentQuestionIndex, quizCompleted, score, loading, error } = storeToRefs(quizStore)
 const { startQuiz, submitAnswer, resetQuiz } = quizStore
 
-onMounted(() => {
+onMounted(async () => {
   if (route.params.id) {
-    startQuiz(route.params.id)
+    await startQuiz(route.params.id)
   } else {
     router.push('/')
   }
@@ -60,9 +67,13 @@ const handleReset = () => {
   padding: 2rem;
 }
 
-.loading {
+.loading, .error {
   text-align: center;
   padding: 2rem;
+}
+
+.error {
+  color: #c62828;
 }
 
 .results {
