@@ -48,15 +48,24 @@ const handleResetPassword = async () => {
     await authStore.resetPassword(email.value)
     success.value = true
     setTimeout(() => {
-      router.push('/login')
+      router.replace('/login')
     }, 3000)
-  } catch (error) {
-    // Error is handled by the store
+  } catch (err) {
+    console.error('Password reset error:', err)
+    if (err.code === 'auth/invalid-email') {
+      error.value = 'Please enter a valid email address'
+    } else if (err.code === 'auth/user-not-found') {
+      error.value = 'No account found with this email address'
+    } else if (err.code === 'auth/too-many-requests') {
+      error.value = 'Too many attempts. Please try again later'
+    } else {
+      error.value = err.message || 'Failed to send reset email. Please try again.'
+    }
   }
 }
 
 const showLogin = () => {
-  router.push('/login')
+  router.replace('/login')
 }
 </script>
 
