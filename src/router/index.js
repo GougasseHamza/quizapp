@@ -22,31 +22,31 @@ const router = createRouter({
       path: '/quiz/:id',
       name: 'quiz',
       component: QuizView,
-      //meta: { requiresAuth: true }
+      meta: { requiresAuth: true }
     },
     {
       path: '/leaderboard',
       name: 'leaderboard',
       component: LeaderboardView,
-      //meta: { requiresAuth: true }
+      meta: { requiresAuth: true }
     },
     {
       path: '/profile',
       name: 'profile',
       component: ProfileView,
-      //meta: { requiresAuth: true }
+      meta: { requiresAuth: true }
     },
     {
       path: '/admin',
       name: 'admin',
       component: AdminView,
-      //meta: { requiresAuth: true, requiresAdmin: true }
+      meta: { requiresAuth: true, requiresAdmin: true }
     },
     {
       path: '/login',
       name: 'login',
       component: LoginView,
-      //meta: { requiresGuest: true }
+      meta: { requiresGuest: true }
     },
     {
       path: '/register',
