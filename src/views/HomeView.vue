@@ -9,7 +9,7 @@
           <span class="difficulty">{{ quiz.difficulty }}</span>
         </div>
         <p>{{ quiz.questions.length }} questions</p>
-        <button @click="startQuiz(quiz.id)" class="start-button">Start Quiz</button>
+        <router-link :to="`/quiz/${quiz.id}`" class="start-button">Start Quiz</router-link>
       </div>
     </div>
   </div>
@@ -72,6 +72,8 @@ const { startQuiz } = quizStore
 
 .start-button {
   background-color: #4caf50;
+  text-align: center;
+  display: inline-block;
   color: white;
   border: none;
   padding: 0.5rem 1rem;
