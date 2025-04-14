@@ -1,8 +1,8 @@
 <template>
-  <div class="register-container">
-    <div class="register-box">
-      <h2>Create Account</h2>
-      <form @submit.prevent="handleRegister">
+  <div class="forgot-password-container">
+    <div class="forgot-password-box">
+      <h2>Reset Password</h2>
+      <form @submit.prevent="handleResetPassword">
         <div class="form-group">
           <label for="email">Email</label>
           <input 
@@ -14,36 +14,17 @@
             :disabled="loading"
           >
         </div>
-        <div class="form-group">
-          <label for="password">Password</label>
-          <input 
-            type="password" 
-            id="password" 
-            v-model="password" 
-            required 
-            placeholder="Create a password"
-            :disabled="loading"
-          >
-        </div>
-        <div class="form-group">
-          <label for="confirmPassword">Confirm Password</label>
-          <input 
-            type="password" 
-            id="confirmPassword" 
-            v-model="confirmPassword" 
-            required 
-            placeholder="Confirm your password"
-            :disabled="loading"
-          >
-        </div>
         <div v-if="error" class="error-message">
           {{ error }}
         </div>
-        <button type="submit" class="register-btn" :disabled="loading">
-          {{ loading ? 'Creating account...' : 'Register' }}
+        <div v-if="success" class="success-message">
+          Password reset email sent! Please check your inbox.
+        </div>
+        <button type="submit" class="reset-btn" :disabled="loading">
+          {{ loading ? 'Sending...' : 'Send Reset Link' }}
         </button>
         <div class="links">
-          <a @click="showLogin">Already have an account? Login</a>
+          <a @click="showLogin">Back to Login</a>
         </div>
       </form>
     </div>
@@ -58,20 +39,17 @@ import { useAuthStore } from '../stores/auth'
 const router = useRouter()
 const authStore = useAuthStore()
 const email = ref('')
-const password = ref('')
-const confirmPassword = ref('')
+const success = ref(false)
 
 const { loading, error } = authStore
 
-const handleRegister = async () => {
-  if (password.value !== confirmPassword.value) {
-    error.value = 'Passwords do not match'
-    return
-  }
-
+const handleResetPassword = async () => {
   try {
-    await authStore.register(email.value, password.value)
-    router.push('/')
+    await authStore.resetPassword(email.value)
+    success.value = true
+    setTimeout(() => {
+      router.push('/login')
+    }, 3000)
   } catch (error) {
     // Error is handled by the store
   }
@@ -83,7 +61,7 @@ const showLogin = () => {
 </script>
 
 <style scoped>
-.register-container {
+.forgot-password-container {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -91,7 +69,7 @@ const showLogin = () => {
   background-color: #f5f5f5;
 }
 
-.register-box {
+.forgot-password-box {
   background: white;
   padding: 2rem;
   border-radius: 8px;
@@ -135,7 +113,13 @@ input:disabled {
   text-align: center;
 }
 
-.register-btn {
+.success-message {
+  color: #28a745;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.reset-btn {
   width: 100%;
   padding: 0.75rem;
   background-color: #4CAF50;
@@ -147,12 +131,12 @@ input:disabled {
   margin-top: 1rem;
 }
 
-.register-btn:disabled {
+.reset-btn:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
 }
 
-.register-btn:hover:not(:disabled) {
+.reset-btn:hover:not(:disabled) {
   background-color: #45a049;
 }
 

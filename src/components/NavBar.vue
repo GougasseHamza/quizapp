@@ -4,11 +4,11 @@
       <router-link to="/">Quiz App</router-link>
     </div>
     <div class="nav-links">
-      <template v-if="isAuthenticated">
+      <template v-if="authStore.user">
         <router-link to="/">Home</router-link>
         <router-link to="/leaderboard">Leaderboard</router-link>
         <router-link to="/profile">Profile</router-link>
-        <router-link to="/admin" v-if="isAdmin">Admin</router-link>
+        <router-link to="/admin" v-if="false">Admin</router-link>
         <button @click="handleLogout" class="logout-button">Logout</button>
       </template>
       <template v-else>
@@ -22,16 +22,20 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const isAuthenticated = ref(false) // TODO: Replace with actual auth state
 const isAdmin = ref(false) // TODO: Replace with actual admin state
 
-const handleLogout = () => {
-  // TODO: Implement actual logout logic
-  isAuthenticated.value = false
-  isAdmin.value = false
-  router.push('/login')
+const handleLogout = async () => {
+  try {
+    await authStore.logout()
+    router.replace('/login')
+  } catch (error) {
+    console.error('Logout error:', error)
+  }
 }
 </script>
 
