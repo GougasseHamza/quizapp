@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
+
 import { getFirestore, collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, query, where } from 'firebase/firestore'
 import { getAnalytics } from 'firebase/analytics'
 
@@ -11,12 +12,14 @@ const firebaseConfig = {
   messagingSenderId: "1049584172567",
   appId: "1:1049584172567:web:63eb1d4f5f48da87a2a652",
   measurementId: "G-HW9ZF20HPE"
+
 }
 
 const app = initializeApp(firebaseConfig)
 const auth = getAuth(app)
 const db = getFirestore(app)
 const analytics = getAnalytics(app)
+
 
 // Quiz collection reference
 const quizzesCollection = collection(db, 'quizzes')
@@ -101,3 +104,4 @@ export {
   updateQuiz,
   deleteQuiz
 } 
+

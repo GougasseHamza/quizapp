@@ -6,6 +6,8 @@ import ProfileView from '../views/ProfileView.vue'
 import AdminView from '../views/AdminView.vue'
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
+import ForgotPasswordView from '../views/ForgotPasswordView.vue'
+import { useAuthStore } from '../stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -50,15 +52,22 @@ const router = createRouter({
       path: '/register',
       name: 'register',
       component: RegisterView,
-      //meta: { requiresGuest: true }
+      meta: { requiresGuest: true }
+    },
+    {
+      path: '/forgot-password',
+      name: 'forgot-password',
+      component: ForgotPasswordView,
+      meta: { requiresGuest: true }
     }
   ]
 })
 
 // Navigation guard
 router.beforeEach((to, from, next) => {
-  const isAuthenticated = false // TODO: Replace with actual auth check
-  const isAdmin = false // TODO: Replace with actual admin check
+  const authStore = useAuthStore()
+  const isAuthenticated = !!authStore.user
+  const isAdmin = false // TODO: Implement admin check
 
   if (to.meta.requiresAuth && !isAuthenticated) {
     next('/login')

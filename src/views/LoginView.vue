@@ -1,35 +1,39 @@
 <template>
-  <div class="auth-container">
-    <div class="auth-card">
+  <div class="login-container">
+    <div class="login-box">
       <h2>Login</h2>
-      <form @submit.prevent="handleLogin" class="auth-form">
+      <form @submit.prevent="handleLogin">
         <div class="form-group">
           <label for="email">Email</label>
-          <input
-            id="email"
-            v-model="form.email"
-            type="email"
-            required
+          <input 
+            type="email" 
+            id="email" 
+            v-model="email" 
+            required 
             placeholder="Enter your email"
+            :disabled="loading"
           >
         </div>
         <div class="form-group">
           <label for="password">Password</label>
-          <input
-            id="password"
-            v-model="form.password"
-            type="password"
-            required
+          <input 
+            type="password" 
+            id="password" 
+            v-model="password" 
+            required 
             placeholder="Enter your password"
+            :disabled="loading"
           >
         </div>
-        <div class="form-actions">
-          <button type="submit" class="submit-button" :disabled="loading">
-            {{ loading ? 'Logging in...' : 'Login' }}
-          </button>
-          <p class="auth-link">
-            Don't have an account? <router-link to="/register">Register</router-link>
-          </p>
+        <div v-if="error" class="error-message">
+          {{ error }}
+        </div>
+        <button type="submit" class="login-btn" :disabled="loading">
+          {{ loading ? 'Logging in...' : 'Login' }}
+        </button>
+        <div class="links">
+          <a @click="showRegister">Create an account</a>
+          <a @click="showForgotPassword">Forgot password?</a>
         </div>
       </form>
     </div>
@@ -37,115 +41,127 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
+import { auth } from '../firebase/config'
 
 const router = useRouter()
-const loading = ref(false)
+const authStore = useAuthStore()
+const email = ref('')
+const password = ref('')
+const error = ref('')
 
-const form = reactive({
-  email: '',
-  password: ''
-})
+const { loading } = authStore
 
 const handleLogin = async () => {
-  loading.value = true
   try {
-    // TODO: Implement actual login logic with backend
-    console.log('Login attempt:', form)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    router.push('/')
-  } catch (error) {
-    console.error('Login failed:', error)
-  } finally {
-    loading.value = false
+    console.log('Attempting login with:', email.value)
+    const userCredential = await authStore.login(email.value, password.value)
+    console.log('Login successful:', userCredential)
+    router.replace('/')
+  } catch (err) {
+    console.error('Login error:', err)
+    error.value = err.message || 'Failed to login. Please try again.'
   }
+}
+
+const showRegister = () => {
+  router.replace('/register')
+}
+
+const showForgotPassword = () => {
+  router.replace('/forgot-password')
 }
 </script>
 
 <style scoped>
-.auth-container {
-  min-height: 100vh;
+.login-container {
   display: flex;
-  align-items: center;
   justify-content: center;
-  padding: 2rem;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #f5f5f5;
 }
 
-.auth-card {
+.login-box {
   background: white;
   padding: 2rem;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
   width: 100%;
   max-width: 400px;
 }
 
-.auth-form {
-  margin-top: 2rem;
+h2 {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: #2c3e50;
 }
 
 .form-group {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
-.form-group label {
+label {
   display: block;
   margin-bottom: 0.5rem;
-  color: #666;
+  color: #2c3e50;
 }
 
-.form-group input {
+input {
   width: 100%;
-  padding: 0.75rem;
+  padding: 0.5rem;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 1rem;
 }
 
-.form-group input:focus {
-  outline: none;
-  border-color: var(--primary-color);
+input:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
 }
 
-.form-actions {
-  margin-top: 2rem;
+.error-message {
+  color: #dc3545;
+  margin-bottom: 1rem;
+  text-align: center;
 }
 
-.submit-button {
+.login-btn {
   width: 100%;
   padding: 0.75rem;
-  background-color: var(--primary-color);
+  background-color: #4CAF50;
   color: white;
   border: none;
   border-radius: 4px;
   font-size: 1rem;
   cursor: pointer;
-  transition: background-color 0.2s;
+  margin-top: 1rem;
 }
 
-.submit-button:hover {
-  background-color: #388e3c;
-}
-
-.submit-button:disabled {
+.login-btn:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
 }
 
-.auth-link {
-  text-align: center;
+.login-btn:hover:not(:disabled) {
+  background-color: #45a049;
+}
+
+.links {
+  display: flex;
+  justify-content: space-between;
   margin-top: 1rem;
-  color: #666;
 }
 
-.auth-link a {
-  color: var(--primary-color);
+.links a {
+  color: #4CAF50;
   text-decoration: none;
+  cursor: pointer;
 }
 
-.auth-link a:hover {
+.links a:hover {
   text-decoration: underline;
 }
 </style> 
