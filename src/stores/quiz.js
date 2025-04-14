@@ -1,25 +1,37 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getQuizzes, getQuizById, addQuiz, updateQuiz, deleteQuiz } from '../firebase/config'
+import { db } from '../firebase/config'
+import { collection, getDocs, addDoc, query, where, orderBy, doc, getDoc, updateDoc, setDoc } from 'firebase/firestore'
+import { useAuthStore } from './auth'
 
 export const useQuizStore = defineStore('quiz', () => {
   const availableQuizzes = ref([])
   const currentQuiz = ref(null)
   const currentQuestionIndex = ref(0)
   const userAnswers = ref([])
+  const quizStartTime = ref(null)
+  const quizEndTime = ref(null)
   const quizCompleted = ref(false)
+  const score = ref(0)
   const loading = ref(false)
   const error = ref(null)
+  const authStore = useAuthStore()
 
   // Fetch all quizzes from Firebase
   const fetchQuizzes = async () => {
     loading.value = true
     error.value = null
     try {
-      availableQuizzes.value = await getQuizzes()
+      const querySnapshot = await getDocs(collection(db, 'quizzes'))
+      availableQuizzes.value = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
     } catch (err) {
       error.value = err.message
       console.error('Error fetching quizzes:', err)
+      throw err
     } finally {
       loading.value = false
     }
@@ -30,7 +42,15 @@ export const useQuizStore = defineStore('quiz', () => {
     loading.value = true
     error.value = null
     try {
-      return await getQuizById(id)
+      const quiz = availableQuizzes.value.find(q => q.id === id)
+      if (quiz) {
+        currentQuiz.value = quiz
+        console.log('Quiz loaded:', quiz)
+        return quiz
+      } else {
+        error.value = 'Quiz not found'
+        return null
+      }
     } catch (err) {
       error.value = err.message
       console.error('Error fetching quiz:', err)
@@ -98,38 +118,37 @@ export const useQuizStore = defineStore('quiz', () => {
     loading.value = true
     error.value = null
     try {
-      // Reset quiz state
-      currentQuiz.value = null
+      const quiz = availableQuizzes.value.find(q => q.id === quizId)
+      if (!quiz) throw new Error('Quiz not found')
+      
+      currentQuiz.value = quiz
       currentQuestionIndex.value = 0
       userAnswers.value = []
+      quizStartTime.value = new Date()
       quizCompleted.value = false
-      
-      // Fetch quiz from Firebase
-      const quiz = await getQuizById(quizId)
-      
-      if (quiz) {
-        // Set current quiz
-        currentQuiz.value = quiz
-        console.log('Quiz loaded:', quiz)
-      } else {
-        error.value = 'Quiz not found'
-      }
+      score.value = 0
     } catch (err) {
       error.value = err.message
       console.error('Error starting quiz:', err)
+      throw err
     } finally {
       loading.value = false
     }
   }
 
   const submitAnswer = (answer) => {
-    if (!currentQuiz.value || !currentQuestion.value) return
-    
     userAnswers.value.push({
-      questionId: currentQuestion.value.id,
+      questionIndex: currentQuestionIndex.value,
       answer
     })
 
+    // Check if answer is correct
+    const currentQuestion = currentQuiz.value.questions[currentQuestionIndex.value]
+    if (answer === currentQuestion.correctAnswer) {
+      score.value++
+    }
+
+    // Move to next question or complete quiz
     if (currentQuestionIndex.value < currentQuiz.value.questions.length - 1) {
       currentQuestionIndex.value++
     } else {
@@ -142,19 +161,106 @@ export const useQuizStore = defineStore('quiz', () => {
     return currentQuiz.value.questions[currentQuestionIndex.value]
   })
 
-  const score = computed(() => {
-    if (!quizCompleted.value || !currentQuiz.value) return 0
-    return userAnswers.value.reduce((total, userAnswer) => {
-      const question = currentQuiz.value.questions.find(q => q.id === userAnswer.questionId)
-      return total + (question.correctAnswer === userAnswer.answer ? 1 : 0)
-    }, 0)
-  })
+  const finishQuiz = async () => {
+    if (!currentQuiz.value || !quizCompleted.value) return
+
+    quizEndTime.value = new Date()
+    const timeTaken = Math.floor((quizEndTime.value - quizStartTime.value) / 1000)
+
+    try {
+      // Save quiz attempt to Firestore
+      const quizAttempt = {
+        userId: authStore.user.uid,
+        quizId: currentQuiz.value.id,
+        score: score.value,
+        totalQuestions: currentQuiz.value.questions.length,
+        timeTaken,
+        date: new Date(),
+        answers: userAnswers.value,
+        quizTitle: currentQuiz.value.title,
+        quizCategory: currentQuiz.value.category,
+        quizDifficulty: currentQuiz.value.difficulty
+      }
+
+      await addDoc(collection(db, 'quizAttempts'), quizAttempt)
+
+      // Update user's quiz statistics
+      const userStatsRef = doc(db, 'userStats', authStore.user.uid)
+      const userStatsDoc = await getDoc(userStatsRef)
+      
+      if (userStatsDoc.exists()) {
+        const currentStats = userStatsDoc.data()
+        const newTotalQuizzes = currentStats.totalQuizzes + 1
+        const newTotalScore = currentStats.totalScore + score.value
+        const newAverageScore = Math.round((newTotalScore / newTotalQuizzes) * 100)
+        
+        await updateDoc(userStatsRef, {
+          totalQuizzes: newTotalQuizzes,
+          totalScore: newTotalScore,
+          averageScore: newAverageScore,
+          lastQuizAttempt: new Date()
+        })
+      } else {
+        await setDoc(userStatsRef, {
+          totalQuizzes: 1,
+          totalScore: score.value,
+          averageScore: score.value,
+          lastQuizAttempt: new Date()
+        })
+      }
+
+      return score.value
+    } catch (error) {
+      console.error('Error saving quiz attempt:', error)
+      throw error
+    }
+  }
 
   const resetQuiz = () => {
     currentQuiz.value = null
     currentQuestionIndex.value = 0
     userAnswers.value = []
+    quizStartTime.value = null
+    quizEndTime.value = null
     quizCompleted.value = false
+    score.value = 0
+  }
+
+  const fetchUserQuizHistory = async (userId) => {
+    try {
+      const q = query(
+        collection(db, 'quizAttempts'),
+        where('userId', '==', userId),
+        orderBy('date', 'desc')
+      )
+      const querySnapshot = await getDocs(q)
+      return querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+    } catch (error) {
+      console.error('Error fetching quiz history:', error)
+      throw error
+    }
+  }
+
+  const calculateUserStats = (quizHistory) => {
+    if (!quizHistory.length) return { 
+      totalQuizzes: 0, 
+      averageScore: 0,
+      lastQuizAttempt: null
+    }
+
+    const totalQuizzes = quizHistory.length
+    const totalScore = quizHistory.reduce((sum, attempt) => {
+      return sum + (attempt.score / attempt.totalQuestions) * 100
+    }, 0)
+
+    return {
+      totalQuizzes,
+      averageScore: Math.round(totalScore / totalQuizzes),
+      lastQuizAttempt: quizHistory[0]?.date || null
+    }
   }
 
   return {
@@ -163,6 +269,8 @@ export const useQuizStore = defineStore('quiz', () => {
     currentQuestion,
     currentQuestionIndex,
     userAnswers,
+    quizStartTime,
+    quizEndTime,
     quizCompleted,
     score,
     loading,
@@ -174,6 +282,9 @@ export const useQuizStore = defineStore('quiz', () => {
     removeQuiz,
     startQuiz,
     submitAnswer,
-    resetQuiz
+    resetQuiz,
+    finishQuiz,
+    fetchUserQuizHistory,
+    calculateUserStats
   }
 }) 

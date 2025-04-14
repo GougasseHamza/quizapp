@@ -87,9 +87,19 @@ onMounted(async () => {
   }
 })
 
-const handleReset = () => {
-  resetQuiz()
-  router.push('/')
+const handleReset = async () => {
+  try {
+    if (quizCompleted.value) {
+      await quizStore.finishQuiz()
+    }
+    resetQuiz()
+    router.push('/')
+  } catch (error) {
+    console.error('Error saving quiz results:', error)
+    // Still reset and navigate even if save fails
+    resetQuiz()
+    router.push('/')
+  }
 }
 
 // Calculate score percentage

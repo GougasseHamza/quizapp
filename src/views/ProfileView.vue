@@ -2,19 +2,23 @@
   <div class="profile">
     <div class="profile-header">
       <div class="avatar">
-        <img :src="user.avatar || 'https://via.placeholder.com/150'" alt="User avatar">
+        <img :src="user.photoURL || 'https://via.placeholder.com/150'" alt="User avatar">
       </div>
       <div class="user-info">
-        <h2>{{ user.name }}</h2>
+        <h2>{{ user.displayName || 'Anonymous User' }}</h2>
         <p class="email">{{ user.email }}</p>
         <div class="stats">
           <div class="stat">
-            <span class="stat-value">{{ user.quizzesTaken }}</span>
+            <span class="stat-value">{{ userStats.totalQuizzes }}</span>
             <span class="stat-label">Quizzes Taken</span>
           </div>
           <div class="stat">
-            <span class="stat-value">{{ user.averageScore }}%</span>
+            <span class="stat-value">{{ userStats.averageScore }}%</span>
             <span class="stat-label">Average Score</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value">{{ userStats.lastQuizAttempt ? formatDate(userStats.lastQuizAttempt) : 'Never' }}</span>
+            <span class="stat-label">Last Quiz</span>
           </div>
         </div>
       </div>
@@ -22,19 +26,32 @@
 
     <div class="quiz-history">
       <h3>Quiz History</h3>
-      <div class="history-grid">
+      <div v-if="loading" class="loading">
+        Loading quiz history...
+      </div>
+      <div v-else-if="error" class="error">
+        {{ error }}
+      </div>
+      <div v-else-if="quizHistory.length === 0" class="no-history">
+        No quiz history available
+      </div>
+      <div v-else class="history-grid">
         <div class="history-header">
           <div>Quiz</div>
+          <div>Category</div>
+          <div>Difficulty</div>
           <div>Score</div>
           <div>Date</div>
           <div>Time</div>
         </div>
         
         <div v-for="attempt in quizHistory" :key="attempt.id" class="history-row">
-          <div class="quiz-title">{{ getQuizTitle(attempt.quizId) }}</div>
-          <div class="score">{{ attempt.score }}/{{ getQuizMaxScore(attempt.quizId) }}</div>
+          <div class="quiz-title">{{ attempt.quizTitle }}</div>
+          <div class="category">{{ attempt.quizCategory }}</div>
+          <div class="difficulty">{{ attempt.quizDifficulty }}</div>
+          <div class="score">{{ attempt.score }}/{{ attempt.totalQuestions }}</div>
           <div class="date">{{ formatDate(attempt.date) }}</div>
-          <div class="time">{{ formatTime(attempt.time) }}</div>
+          <div class="time">{{ formatTime(attempt.timeTaken) }}</div>
         </div>
       </div>
     </div>
@@ -42,40 +59,28 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useQuizStore } from '../stores/quiz'
+import { useAuthStore } from '../stores/auth'
 import { storeToRefs } from 'pinia'
 
 const quizStore = useQuizStore()
-const { availableQuizzes } = storeToRefs(quizStore)
+const authStore = useAuthStore()
+const { user } = storeToRefs(authStore)
 
-// Mock user data - will be replaced with actual data from backend
-const user = ref({
-  name: 'John Doe',
-  email: 'john@example.com',
-  avatar: null,
-  quizzesTaken: 5,
-  averageScore: 85
+const quizHistory = ref([])
+const loading = ref(true)
+const error = ref(null)
+const userStats = ref({ 
+  totalQuizzes: 0, 
+  averageScore: 0,
+  lastQuizAttempt: null
 })
 
-// Mock quiz history - will be replaced with actual data from backend
-const quizHistory = ref([
-  { id: '1', quizId: '1', score: 8, date: '2024-04-14', time: 120 },
-  { id: '2', quizId: '2', score: 7, date: '2024-04-13', time: 150 }
-])
-
-const getQuizTitle = (quizId) => {
-  const quiz = availableQuizzes.value.find(q => q.id === quizId)
-  return quiz ? quiz.title : 'Unknown Quiz'
-}
-
-const getQuizMaxScore = (quizId) => {
-  const quiz = availableQuizzes.value.find(q => q.id === quizId)
-  return quiz ? quiz.questions.length : 0
-}
-
-const formatDate = (dateString) => {
-  return new Date(dateString).toLocaleDateString()
+const formatDate = (date) => {
+  if (!date) return 'Never'
+  const d = new Date(date.seconds * 1000)
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString()
 }
 
 const formatTime = (seconds) => {
@@ -83,6 +88,24 @@ const formatTime = (seconds) => {
   const remainingSeconds = seconds % 60
   return `${minutes}m ${remainingSeconds}s`
 }
+
+onMounted(async () => {
+  try {
+    loading.value = true
+    error.value = null
+    
+    // Fetch quiz history
+    quizHistory.value = await quizStore.fetchUserQuizHistory(user.value.uid)
+    
+    // Calculate user stats
+    userStats.value = quizStore.calculateUserStats(quizHistory.value)
+  } catch (err) {
+    error.value = 'Failed to load quiz history'
+    console.error('Error loading quiz history:', err)
+  } finally {
+    loading.value = false
+  }
+})
 </script>
 
 <style scoped>
@@ -150,22 +173,25 @@ const formatTime = (seconds) => {
 
 .history-grid {
   margin-top: 1rem;
+  overflow-x: auto;
 }
 
 .history-header {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
   padding: 1rem;
   background: var(--background-color);
   font-weight: bold;
   border-bottom: 1px solid #ddd;
+  min-width: 800px;
 }
 
 .history-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
   padding: 1rem;
   border-bottom: 1px solid #eee;
+  min-width: 800px;
 }
 
 .history-row:last-child {
@@ -179,5 +205,23 @@ const formatTime = (seconds) => {
 .score {
   font-weight: bold;
   color: var(--primary-color);
+}
+
+.category {
+  color: #1976d2;
+}
+
+.difficulty {
+  text-transform: capitalize;
+}
+
+.loading, .error, .no-history {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+
+.error {
+  color: #c62828;
 }
 </style> 
