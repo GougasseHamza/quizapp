@@ -2,7 +2,6 @@
   <div class="home">
     <h2>Available Quizzes</h2>
     
-
     <div class="filters">
       <div class="search-container">
         <input
@@ -25,19 +24,16 @@
       </div>
     </div>
 
-    <div v-if="loading" class="loading">
+    <div v-if="isLoading" class="loading">
       Loading quizzes...
     </div>
-    
-    <div v-else-if="error" class="error">
-      {{ error }}
+
+    <div v-else-if="filteredQuizzes.length === 0" class="no-results">
+      <p>No quizzes found matching your criteria.</p>
+      <button @click="clearFilters" class="clear-filters">Clear Filters</button>
     </div>
-    
-    <div v-else-if="availableQuizzes.length === 0" class="no-quizzes">
-      No quizzes available. Check back later!
-    </div>
-    
-    <div v-else class="quiz-grid"></div>
+
+    <div v-else class="quiz-grid">
       <div v-for="quiz in filteredQuizzes" :key="quiz.id" class="quiz-card">
         <h3>{{ quiz.title }}</h3>
         <div class="quiz-info">
@@ -45,35 +41,26 @@
           <span class="difficulty">{{ quiz.difficulty }}</span>
         </div>
         <p>{{ quiz.questions.length }} questions</p>
-        <button @click="handleStartQuiz(quiz.id)" class="start-button">Start Quiz</button>
+        <router-link :to="{ name: 'quiz', params: { id: quiz.id }}" class="start-button">Start Quiz</router-link>
       </div>
     </div>
+  </div>
 </template>
 
 <script setup>
 import { useQuizStore } from '../stores/quiz'
 import { storeToRefs } from 'pinia'
-import { onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ref, computed } from 'vue'
 
 const router = useRouter()
 const quizStore = useQuizStore()
-const { availableQuizzes, loading, error } = storeToRefs(quizStore)
-
-// Fetch quizzes when component mounts
-onMounted(async () => {
-  await quizStore.fetchQuizzes()
-})
-
-// Navigate to quiz page
-const handleStartQuiz = (quizId) => {
-  router.push(`/quiz/${quizId}`)
-}
+const { availableQuizzes } = storeToRefs(quizStore)
 const { startQuiz } = quizStore
 
 const searchQuery = ref('')
 const selectedDifficulty = ref('')
+const isLoading = ref(true)
 
 const difficultyLevels = ['All', 'Easy', 'Medium', 'Hard']
 
@@ -85,6 +72,11 @@ const toggleDifficulty = (level) => {
   }
 }
 
+const clearFilters = () => {
+  searchQuery.value = ''
+  selectedDifficulty.value = ''
+}
+
 const filteredQuizzes = computed(() => {
   return availableQuizzes.value.filter(quiz => {
     const matchesSearch = quiz.title.toLowerCase().includes(searchQuery.value.toLowerCase())
@@ -94,6 +86,16 @@ const filteredQuizzes = computed(() => {
     return matchesSearch && matchesDifficulty
   })
 })
+
+onMounted(async () => {
+  try {
+    await quizStore.fetchQuizzes()
+  } catch (error) {
+    console.error('Failed to load quizzes:', error)
+  } finally {
+    isLoading.value = false
+  }
+})
 </script>
 
 <style scoped>
@@ -101,15 +103,6 @@ const filteredQuizzes = computed(() => {
   padding: 2rem;
 }
 
-.loading, .error, .no-quizzes {
-  text-align: center;
-  padding: 2rem;
-  color: #666;
-}     
-
-.error {
-  color: #c62828;
-}
 .filters {
   margin-bottom: 2rem;
   display: flex;
@@ -159,6 +152,31 @@ const filteredQuizzes = computed(() => {
   background: #4caf50;
   color: white;
   border-color: #4caf50;
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+
+.no-results {
+  text-align: center;
+  padding: 2rem;
+}
+
+.clear-filters {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.clear-filters:hover {
+  background: #388e3c;
 }
 
 .quiz-grid {
