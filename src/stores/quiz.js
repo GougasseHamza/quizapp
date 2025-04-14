@@ -182,17 +182,20 @@ export const useQuizStore = defineStore('quiz', () => {
         quizDifficulty: currentQuiz.value.difficulty
       }
 
+      // Save quiz attempt
       await addDoc(collection(db, 'quizAttempts'), quizAttempt)
 
       // Update user's quiz statistics
       const userStatsRef = doc(db, 'userStats', authStore.user.uid)
       const userStatsDoc = await getDoc(userStatsRef)
       
+      const scorePercentage = Math.round((score.value / currentQuiz.value.questions.length) * 100)
+      
       if (userStatsDoc.exists()) {
         const currentStats = userStatsDoc.data()
         const newTotalQuizzes = currentStats.totalQuizzes + 1
-        const newTotalScore = currentStats.totalScore + score.value
-        const newAverageScore = Math.round((newTotalScore / newTotalQuizzes) * 100)
+        const newTotalScore = currentStats.totalScore + scorePercentage
+        const newAverageScore = Math.round(newTotalScore / newTotalQuizzes)
         
         await updateDoc(userStatsRef, {
           totalQuizzes: newTotalQuizzes,
@@ -203,11 +206,20 @@ export const useQuizStore = defineStore('quiz', () => {
       } else {
         await setDoc(userStatsRef, {
           totalQuizzes: 1,
-          totalScore: score.value,
-          averageScore: score.value,
+          totalScore: scorePercentage,
+          averageScore: scorePercentage,
           lastQuizAttempt: new Date()
         })
       }
+
+      // Reset quiz state
+      currentQuiz.value = null
+      currentQuestionIndex.value = 0
+      userAnswers.value = []
+      quizStartTime.value = null
+      quizEndTime.value = null
+      quizCompleted.value = false
+      score.value = 0
 
       return score.value
     } catch (error) {

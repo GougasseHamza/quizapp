@@ -9,11 +9,11 @@
         <p class="email">{{ user.email }}</p>
         <div class="stats">
           <div class="stat">
-            <span class="stat-value">{{ userStats.totalQuizzes }}</span>
+            <span class="stat-value">{{ userStats.totalQuizzes || 0 }}</span>
             <span class="stat-label">Quizzes Taken</span>
           </div>
           <div class="stat">
-            <span class="stat-value">{{ userStats.averageScore }}%</span>
+            <span class="stat-value">{{ userStats.averageScore || 0 }}%</span>
             <span class="stat-label">Average Score</span>
           </div>
           <div class="stat">
@@ -59,14 +59,19 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useQuizStore } from '../stores/quiz'
 import { useAuthStore } from '../stores/auth'
 import { storeToRefs } from 'pinia'
+import { doc, getDoc } from 'firebase/firestore'
+import { db } from '../firebase/config'
+import { useRoute } from 'vue-router'
 
 const quizStore = useQuizStore()
 const authStore = useAuthStore()
 const { user } = storeToRefs(authStore)
+
+const route = useRoute()
 
 const quizHistory = ref([])
 const loading = ref(true)
@@ -89,22 +94,47 @@ const formatTime = (seconds) => {
   return `${minutes}m ${remainingSeconds}s`
 }
 
-onMounted(async () => {
+const fetchUserStats = async (userId) => {
+  try {
+    const userStatsRef = doc(db, 'userStats', userId)
+    const userStatsDoc = await getDoc(userStatsRef)
+    
+    if (userStatsDoc.exists()) {
+      userStats.value = userStatsDoc.data()
+    }
+  } catch (err) {
+    console.error('Error fetching user stats:', err)
+    error.value = 'Failed to load user statistics'
+  }
+}
+
+// Watch for route changes to refresh data
+watch(() => route.path, async () => {
+  if (route.path === '/profile') {
+    await refreshData()
+  }
+}, { immediate: true })
+
+const refreshData = async () => {
   try {
     loading.value = true
     error.value = null
     
+    // Fetch user stats
+    await fetchUserStats(user.value.uid)
+    
     // Fetch quiz history
     quizHistory.value = await quizStore.fetchUserQuizHistory(user.value.uid)
-    
-    // Calculate user stats
-    userStats.value = quizStore.calculateUserStats(quizHistory.value)
   } catch (err) {
-    error.value = 'Failed to load quiz history'
-    console.error('Error loading quiz history:', err)
+    error.value = 'Failed to load data'
+    console.error('Error loading data:', err)
   } finally {
     loading.value = false
   }
+}
+
+onMounted(async () => {
+  await refreshData()
 })
 </script>
 
